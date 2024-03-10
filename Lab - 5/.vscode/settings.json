@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.erd": "json",
+        "*.vuerd": "json",
+        "limits.h": "c",
+        "string.h": "c"
+    }
+}
