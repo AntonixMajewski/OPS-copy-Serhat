@@ -41,6 +41,7 @@ void child_work(int readpp, int writepp){
     close(writepp-1);
     while ((count = TEMP_FAILURE_RETRY(read(readpp, buf, sizeof(buf) - 1))) > 0) {
         buf[count] = '\0';
+        //printf("PID: %d, received: %s\n", getpid(), buf);
 
         if (strcmp(buf, "STOP") == 0) {
             break;
