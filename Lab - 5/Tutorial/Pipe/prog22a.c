@@ -123,7 +123,7 @@ void parent_work(int n, int *fds, int R)
     }
 }
 
-void create_children_and_pipes(int n, int *fds, int R)
+void create_children_and_pipes(int n, int *fds, int R) //Use this to create n children pipes which is connected to parent
 {
     int tmpfd[2];
     int max = n;

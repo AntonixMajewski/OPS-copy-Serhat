@@ -36,8 +36,8 @@ void parent_work(int N, int rounds, int send_pipes[][2], int recv_pipes[][2])
 
         for (int i = 0; i < N; i++)
         {
-            char start_msg[] = "start";
-            if (write(send_pipes[i][1], start_msg, strlen(start_msg) + 1) == -1)
+            char start_msg[10] = "start";
+            if (write(send_pipes[i][1], start_msg, sizeof(start_msg)) == -1)
                 ERR("write");
 
             char card[10];
@@ -61,7 +61,7 @@ void child_work(int M, int i, int send_pipes[][2], int recv_pipes[][2])
         int card = rand() % M + 1;
         sprintf(buf, "%d", card);
         printf("Player %d is sending card %d\n", i, card);
-        if (write(recv_pipes[i][1], buf, sizeof(buf) + 1) == -1)
+        if (write(recv_pipes[i][1], buf, sizeof(buf)) == -1)
             ERR("write");
     }
 }
