@@ -1,0 +1,15 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": ["${workspaceFolder}/**"],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu99",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "gcc-x64",
+            "files": ["prog22a.c"]
+        }
+    ],
+    "version": 4
+}
