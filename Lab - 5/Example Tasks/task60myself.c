@@ -165,9 +165,6 @@ void parent_work(int readp, int writep)
 
 void create_pipes_and_children(int **fds, int n)
 {
-    int tmpfd[2];
-    if (pipe(tmpfd))
-        ERR("pipe");
     int q = n;
     n--;
     while (n >= 0)
