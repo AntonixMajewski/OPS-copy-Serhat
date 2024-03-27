@@ -28,6 +28,8 @@ struct sum_message
     int b;
 };
 
+volatile sig_atomic_t timed_out = 0;
+
 void sethandler(void (*f)(int, siginfo_t *, void *), int sigNo)
 {
     struct sigaction act;
@@ -77,7 +79,7 @@ void *write_to_queue(void *arg)
 {
     queuenames q_names = *(queuenames *)arg;
 
-    while (1)
+    while (timed_out==0)
     {
         mqd_t mq_s;
         struct sum_message msg;
@@ -123,6 +125,7 @@ void *write_to_queue(void *arg)
         mq_close(mq_s);
         
     }
+    return NULL;
 
 }
 void *read_from_queue(void *arg)
@@ -138,10 +141,31 @@ void *read_from_queue(void *arg)
     {
         perror("mq_notify rq client");
     }
-    while (1)
+
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 5; // 5 seconds timeout
+
+    char msg[20]; // Adjust size as needed
+    while (timed_out == 0)
     {
-        ;
+        if (mq_timedreceive(mq, msg, 8192, NULL, &ts) == -1)
+        {
+            if (errno == ETIMEDOUT)
+            {
+                printf("Receive timeout occurred\n");
+                mq_close(mq);
+                timed_out = 1;
+                break;
+            }
+            perror("mq_receive");
+        }
+        else
+        {
+            printf("Received message: %s\n", msg);
+        }
     }
+
     return NULL;
 }
 
@@ -169,9 +193,18 @@ int main(int argc, char **argv)
 
     pthread_create(&read_thread, NULL, read_from_queue, &mq_mine);
 
+    while(timed_out==0)
+    {
+        ;
+    }
+    pthread_cancel(write_thread);
+    pthread_cancel(read_thread);
+    
+
     pthread_join(write_thread, NULL);
     pthread_join(read_thread, NULL);
-
+    mq_close(mq_mine);
+    mq_unlink(pid_str);
     // ClientWork(args);
     return 0;
 }

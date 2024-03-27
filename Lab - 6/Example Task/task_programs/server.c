@@ -13,6 +13,12 @@
 #define ERR(source) \
     (fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), perror(source), kill(0, SIGKILL), exit(EXIT_FAILURE))
 
+volatile sig_atomic_t run = 1;
+
+void handle_sigint(int sig) {
+    run = 0;
+}
+
 struct sum_message
 {
     int a;
@@ -218,9 +224,10 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    sethandler(handle_sigint, SIGINT);
 
     
-    while (1)
+    while (run)
     {
         ;
     }
@@ -229,10 +236,7 @@ int main(int argc, char **argv)
     mq_close(mq_d);
     mq_close(mq_m);
 
-    for (;;)
-    {
-        wait(NULL);
-    }
+
     mq_unlink(name_s);
     mq_unlink(name_d);
     mq_unlink(name_m);
