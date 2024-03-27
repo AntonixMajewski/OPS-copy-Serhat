@@ -27,20 +27,13 @@ void sethandler(void (*f)(int, siginfo_t *, void *), int sigNo)
         ERR("sigaction");
 }
 
-void mq_handler(int sig, siginfo_t *info, void *p)
+void function(union sigval sv)
 {
     mqd_t *pin;
     uint8_t ni;
     unsigned msg_prio;
 
-    pin = (mqd_t *)info->si_value.sival_ptr;
-
-    static struct sigevent not ;
-    not .sigev_notify = SIGEV_SIGNAL;
-    not .sigev_signo = SIGRTMIN;
-    not .sigev_value.sival_ptr = pin;
-    if (mq_notify(*pin, &not ) < 0)
-        ERR("mq_notify");
+    pin = (mqd_t *)sv.sival_ptr;
 
     for (;;)
     {
@@ -56,6 +49,13 @@ void mq_handler(int sig, siginfo_t *info, void *p)
         else
             printf("MQ:%d is a bingo number!\n", ni);
     }
+
+    static struct sigevent not;
+    not.sigev_notify = SIGEV_THREAD;
+    not.sigev_notify_function = function;
+    not.sigev_value.sival_ptr = pin;
+    if (mq_notify(*pin, &not) < 0)
+        ERR("mq_notify");
 }
 
 void sigchld_handler(int sig, siginfo_t *s, void *p)
@@ -157,12 +157,11 @@ int main(int argc, char **argv)
         ERR("mq open out");
 
     sethandler(sigchld_handler, SIGCHLD);
-    sethandler(mq_handler, SIGRTMIN);
     create_children(n, pin, pout);
 
     static struct sigevent noti;
-    noti.sigev_notify = SIGEV_SIGNAL;
-    noti.sigev_signo = SIGRTMIN;
+    noti.sigev_notify = SIGEV_THREAD;
+    noti.sigev_notify_function = function;
     noti.sigev_value.sival_ptr = &pin;
     if (mq_notify(pin, &noti) < 0)
         ERR("mq_notify");

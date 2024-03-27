@@ -72,6 +72,29 @@ void sumHandler(int sig, siginfo_t *info, void *ucontext)
     }
 }
 
+void moduloHandler(int sig, siginfo_t *info, void *ucontext)
+{
+    printf("Signal received\n");
+    mqd_t mq = *(mqd_t *)info->si_value.sival_ptr;
+    struct sum_message msg;
+    char message[20];
+    if (mq_receive(mq, message, 8192, NULL) == -1)
+    {
+        perror("mq_receive");
+        exit(1);
+    }
+
+    sscanf(message, "%d %d", &msg.a, &msg.b);
+    int modulo = msg.a % msg.b;
+    char* modulo_str = (char*)malloc(20);
+    sprintf(modulo_str, "%d", modulo);
+    if (mq_send(mq, modulo_str, sizeof(msg), 0) == -1)
+    {
+        perror("mq_send");
+        exit(1);
+    }
+}
+
 void ClientWork(queuenames q_names)
 {
     int pid = getpid();
@@ -132,15 +155,6 @@ void ClientWork(queuenames q_names)
     mq_close(mq);
     mq_close(mq_s);
     mq_unlink(name_mq);
-}
-
-void ServerSumWork(struct sum_message message, mqd_t mq)
-{
-    struct sum_message msg;
-    msg.a = message.a + message.b;
-    printf("Sum: %d\n", msg.a);
-    
-
 }
 
 int main(int argc, char **argv)
