@@ -70,44 +70,91 @@ void notification_function(union sigval sv)
     // Re-register for the next message
     
 }
-void sumHandler(int sig, siginfo_t *info, void *ucontext)
-{
-    printf("Signal received\n");
-    mqd_t mq = *(mqd_t *)info->si_value.sival_ptr;
-    struct sum_message msg;
-    char message[20];
-    static struct sigevent not ;
-    not .sigev_notify = SIGEV_THREAD;
-    not .sigev_notify_function = notification_function;
-    not .sigev_value.sival_ptr = info->si_value.sival_ptr;
-    if (mq_notify(mq, &not ) < 0)
-        ERR("mq_notify");
 
-    ssize_t received = mq_receive(mq, message, 8192, NULL);
-    if (received < 1)
+void notifacation_modulo(union sigval sv)
+{
+    printf("Notification received MODULOOO\n");
+    mqd_t mq = *(mqd_t *)(sv.sival_ptr);
+    char message[20]; // Adjust size as needed
+    struct sigevent sev;
+    sev.sigev_notify = SIGEV_THREAD;
+    sev.sigev_notify_function = notifacation_modulo;
+    sev.sigev_notify_attributes = NULL;
+    sev.sigev_value.sival_ptr = sv.sival_ptr;
+    if (mq_notify(mq, &sev) == -1)
     {
-        if (errno != EAGAIN)
-        {
-            perror("mq_receive");
-            exit(1);
-        }
+        perror("mq_notify asjdnaklda");
+        exit(1);
     }
-    else
+
+    if (mq_receive(mq, message, 8192, NULL) == -1)
     {
-        sscanf(message, "%d %d", &msg.a, &msg.b);
-        int sum = msg.a + msg.b;
-        char *sum_str = (char *)malloc(20);
-        sprintf(sum_str, "%d", sum);
-        if (mq_send(mq, sum_str, sizeof(msg), 0) == -1)
-        {
-            perror("mq_send");
-            free(sum_str); // Free the allocated memory before exiting
-            exit(1);
-        }
-        printf("Sent message: %s\n", sum_str);
-        free(sum_str); // Free the allocated memory after it's no longer needed
+        perror("mq_receive");
+        exit(1);
     }
+    struct sum_message msg;
+    pid_t pids = getpid();
+    sscanf(message, "%d %d %d", &msg.a, &msg.b, &pids);
+    char name_m[20];
+    sprintf(name_m, "/%d", pids);
+    printf("Received message: %s \n", name_m);
+    mqd_t mq_m = mq_open(name_m, O_RDWR, 0666, NULL);
+    int sum = msg.a % msg.b;
+    char *sum_str = (char *)malloc(20);
+    sprintf(sum_str, "%d", sum);
+    if (mq_send(mq_m, sum_str, sizeof(msg) + 1, 0) == -1)
+    {
+        perror("mq_send asdasd asda");
+        free(sum_str);
+        exit(1);
+    }
+    printf("Sent message: %s\n", sum_str);
+
+    // Re-register for the next message
 }
+
+void notification_division(union sigval sv)
+{
+    printf("Notification received DIVISION\n");
+    mqd_t mq = *(mqd_t *)(sv.sival_ptr);
+    char message[20]; // Adjust size as needed
+    struct sigevent sev;
+    sev.sigev_notify = SIGEV_THREAD;
+    sev.sigev_notify_function = notification_division;
+    sev.sigev_notify_attributes = NULL;
+    sev.sigev_value.sival_ptr = sv.sival_ptr;
+    if (mq_notify(mq, &sev) == -1)
+    {
+        perror("mq_notify asjdnaklda");
+        exit(1);
+    }
+
+    if (mq_receive(mq, message, 8192, NULL) == -1)
+    {
+        perror("mq_receive");
+        exit(1);
+    }
+    struct sum_message msg;
+    pid_t pids = getpid();
+    sscanf(message, "%d %d %d", &msg.a, &msg.b, &pids);
+    char name_m[20];
+    sprintf(name_m, "/%d", pids);
+    printf("Received message: %s \n", name_m);
+    mqd_t mq_m = mq_open(name_m, O_RDWR, 0666, NULL);
+    int sum = msg.a / msg.b;
+    char *sum_str = (char *)malloc(20);
+    sprintf(sum_str, "%d", sum);
+    if (mq_send(mq_m, sum_str, sizeof(msg) + 1, 0) == -1)
+    {
+        perror("mq_send asdasd asda");
+        free(sum_str);
+        exit(1);
+    }
+    printf("Sent message: %s\n", sum_str);
+
+    // Re-register for the next message
+}
+
 
 int main(int argc, char **argv)
 {
@@ -148,6 +195,29 @@ int main(int argc, char **argv)
         perror("mq_notify asdklamsdk");
         exit(1);
     }
+
+    struct sigevent sev2;
+    sev2.sigev_notify = SIGEV_THREAD;
+    sev2.sigev_notify_function = notifacation_modulo;
+    sev2.sigev_notify_attributes = NULL;
+    sev2.sigev_value.sival_ptr = &mq_m;
+    if (mq_notify(mq_m, &sev2) == -1)
+    {
+        perror("mq_notify asdklamsdk");
+        exit(1);
+    }
+
+    struct sigevent sev3;
+    sev3.sigev_notify = SIGEV_THREAD;
+    sev3.sigev_notify_function = notification_division;
+    sev3.sigev_notify_attributes = NULL;
+    sev3.sigev_value.sival_ptr = &mq_d;
+    if (mq_notify(mq_d, &sev3) == -1)
+    {
+        perror("mq_notify asdklamsdk");
+        exit(1);
+    }
+
 
     
     while (1)

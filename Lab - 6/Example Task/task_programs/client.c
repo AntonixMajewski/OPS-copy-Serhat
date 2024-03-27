@@ -19,7 +19,7 @@ typedef struct queuenames
     char name_s[20];
     char name_d[20];
     char name_m[20];
-    pid_t name_c; 
+    pid_t name_c;
 } queuenames;
 
 struct sum_message
@@ -63,7 +63,7 @@ void notification_function(int signo, siginfo_t *info, void *context)
 
     struct sigevent sev;
     sev.sigev_notify = SIGEV_SIGNAL; // Change to SIGEV_SIGNAL
-    sev.sigev_signo = SIGUSR1; // Specify the signal to be sent
+    sev.sigev_signo = SIGUSR1;       // Specify the signal to be sent
     sev.sigev_value.sival_ptr = &mq;
     if (mq_notify(mq, &sev) == -1)
     {
@@ -77,14 +77,9 @@ void *write_to_queue(void *arg)
 {
     queuenames q_names = *(queuenames *)arg;
 
-    mqd_t mq_s = mq_open(q_names.name_s, O_RDWR);
-    if (mq_s == -1)
-    {
-        perror("Queue open failed");
-        exit(1);
-    }
     while (1)
     {
+        mqd_t mq_s;
         struct sum_message msg;
         printf("Enter two numbers (or 'q' to quit): ");
         fflush(stdout);
@@ -92,29 +87,44 @@ void *write_to_queue(void *arg)
         if (scanf("%d %d", &msg.a, &msg.b) == 2)
         {
             char message[20];
-            sprintf(message,"%d %d %d", msg.a, msg.b, q_names.name_c);
+            sprintf(message, "%d %d %d", msg.a, msg.b, q_names.name_c);
+            printf("Where do u wanna send it?\n");
+            printf("1. %s\n", q_names.name_s);
+            printf("2. %s\n", q_names.name_d);
+            printf("3. %s\n", q_names.name_m);
+            int choice;
+            scanf("%d", &choice);
+            switch (choice)
+            {
+            case 1:
+                mq_s = mq_open(q_names.name_s, O_RDWR);
+                printf("Opened %s\n", q_names.name_s);
+                break;
+                
+            case 2:
+                mq_s = mq_open(q_names.name_d, O_RDWR);
+                printf("Opened %s\n", q_names.name_d);
+                break;
+                
+            case 3:
+                mq_s = mq_open(q_names.name_m, O_RDWR);
+                printf("Opened %s\n", q_names.name_m);
+                break;
+                
+            }
             printf("Sending message: %s\n", message);
 
             if (mq_send(mq_s, message, strlen(message) + 1, 0) == -1)
             {
                 perror("mq_send");
             }
-
         }
-        else
-        {
-            break;
-        }
-    }
-    if (mq_close(mq_s) == -1)
-    {
-        perror("mq_close");
-        exit(1);
+       
+        mq_close(mq_s);
+        
     }
 
-    return NULL;
 }
-
 void *read_from_queue(void *arg)
 {
     mqd_t mq = *(mqd_t *)arg;
@@ -134,7 +144,6 @@ void *read_from_queue(void *arg)
     }
     return NULL;
 }
-
 
 int main(int argc, char **argv)
 {
@@ -157,7 +166,6 @@ int main(int argc, char **argv)
     mqd_t mq_mine = mq_open(pid_str, O_RDWR | O_CREAT, 0666, NULL);
     pthread_t write_thread, read_thread;
     pthread_create(&write_thread, NULL, write_to_queue, &args);
-
 
     pthread_create(&read_thread, NULL, read_from_queue, &mq_mine);
 
