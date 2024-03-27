@@ -36,21 +36,36 @@ void sethandler(void (*f)(int, siginfo_t *, void *), int sigNo)
         ERR("sigaction");
 }
 
-void sumHandler(int sig, siginfo_t *info, void *ucontext)
+void handler(int sig, siginfo_t *info, void *ucontext)
 {
-    printf("Signal received\n");
     mqd_t mq = *(mqd_t *)info->si_value.sival_ptr;
-    struct sum_message msg;
-    if (mq_receive(mq, (char *)&msg, sizeof(msg), NULL) == -1)
+    char msg[20]; // Adjust size as needed
+    if (mq_receive(mq, msg, 8192, NULL) == -1)
     {
         perror("mq_receive");
         exit(1);
     }
 
-    int sum = msg.a + msg.b;
-    printf("Sum: %d\n", sum);
+    printf("Received message: %s\n", msg);
+}
 
-    if (mq_send(mq, (char *)&sum, sizeof(sum), 0) == -1)
+void sumHandler(int sig, siginfo_t *info, void *ucontext)
+{
+    printf("Signal received\n");
+    mqd_t mq = *(mqd_t *)info->si_value.sival_ptr;
+    struct sum_message msg;
+    char message[20];
+    if (mq_receive(mq, message, 8192, NULL) == -1)
+    {
+        perror("mq_receive");
+        exit(1);
+    }
+
+    sscanf(message, "%d %d", &msg.a, &msg.b);
+    int sum = msg.a + msg.b;
+    char* sum_str = (char*)malloc(20);
+    sprintf(sum_str, "%d", sum);
+    if (mq_send(mq, sum_str, sizeof(msg), 0) == -1)
     {
         perror("mq_send");
         exit(1);
@@ -81,7 +96,7 @@ void ClientWork(queuenames q_names)
 
     char message[5];
     sprintf(message, "%d %d", msg.a, msg.b);
-    
+
     mqd_t mq_s = mq_open(q_names.name_s, O_RDWR);
     if (mq_s == -1)
     {
@@ -89,62 +104,48 @@ void ClientWork(queuenames q_names)
         exit(1);
     }
 
-    if (mq_send(mq_s, message, sizeof(message)+1, 0) == -1)
+    if (mq_send(mq_s, message, sizeof(message) + 1, 0) == -1)
     {
         perror("mq_send");
         exit(1);
     }
 
-
-
     printf("Message sent this is the message: %s with size %d\n", message, sizeof(message));
+    sethandler(handler, SIGUSR1);
 
-    int result;
-    if (mq_receive(mq_s, (char *)&result, 8192, NULL) == -1)
+    struct sigevent sev;
+    sev.sigev_notify = SIGEV_SIGNAL;
+    sev.sigev_signo = SIGUSR1;
+    sev.sigev_notify_attributes = NULL;
+    sev.sigev_value.sival_ptr = &mq_s;
+    if (mq_notify(mq_s, &sev) == -1)
     {
-        perror("mq_receive");
+        perror("mq_notify");
         exit(1);
     }
 
-    printf("Received sum: %d\n", result);
-
+    while (1)
+    {
+        ;
+        
+    }
     mq_close(mq);
     mq_close(mq_s);
     mq_unlink(name_mq);
 }
-void serverThread(union sigval sv)
+
+void ServerSumWork(struct sum_message message, mqd_t mq)
 {
-    mqd_t mq = *((mqd_t *) sv.sival_ptr);
-    char message[20];
-    while (1)
-    {
-        if (mq_receive(mq, message, 8192, NULL) == -1)
-        {
-            if(errno == EAGAIN)
-                break; // No more messages
-            perror("mq_receive");
-            exit(1);
-        }
-        
-        struct sum_message msg;
-        sscanf(message, "%d %d", &msg.a, &msg.b);
+    struct sum_message msg;
+    msg.a = message.a + message.b;
+    printf("Sum: %d\n", msg.a);
+    
 
-        int sum = msg.a + msg.b;
-        printf("Sum: %d\n", sum);
-
-        if (mq_send(mq, (char *)&sum, sizeof(sum), 0) == -1)
-        {
-            perror("mq_send");
-            exit(1);
-        }
-    }
 }
 
 int main(int argc, char **argv)
 {
 
-    mq_open("/123", O_RDWR | O_CREAT, 0666, NULL);
-    
 
     int pid = getpid();
     char name_s[20], name_d[20], name_m[20];
@@ -164,19 +165,12 @@ int main(int argc, char **argv)
 
     queuenames args;
 
-    
-
     sprintf(args.name_s, "/%d_s", pid);
     sprintf(args.name_d, "/%d_d", pid);
     sprintf(args.name_m, "/%d_m", pid);
-
-    printf("args.name_s: %s\n", args.name_s);
-    printf("args.name_d: %s\n", args.name_d);
-    printf("args.name_m: %s\n", args.name_m);
-
+    
     int clientPID;
 
-   
     switch (clientPID = fork())
     {
     case -1:
@@ -188,15 +182,22 @@ int main(int argc, char **argv)
         break;
     }
 
+    sethandler(sumHandler, SIGUSR1);
+
     struct sigevent sev;
-    sev.sigev_notify = SIGEV_THREAD;
-    sev.sigev_notify_function = serverThread;
+    sev.sigev_notify = SIGEV_SIGNAL;
+    sev.sigev_signo = SIGUSR1;
     sev.sigev_notify_attributes = NULL;
     sev.sigev_value.sival_ptr = &mq_s;
     if (mq_notify(mq_s, &sev) == -1)
     {
         perror("mq_notify");
         exit(1);
+    }
+
+    while (1)
+    {
+        ;
     }
 
     mq_close(mq_s);
